@@ -71,7 +71,7 @@ def check_knowledge(knowledge, symbols):
 
             #Verificamos si es la respuesta correcta
             if (model["MsScarlet"] == True and model["library"] == True and model["knife"] == True):
-                print("Respuesta final:")
+                print("¡Está es la respuesta correcta!:")
                 print(f"scarlet: YES")
                 print(f"library: YES")
                 print(f"knife: YES")
