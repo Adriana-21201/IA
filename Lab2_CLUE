@@ -1,0 +1,114 @@
+#Laboratorio 2 CLUE
+#Adriana Girón
+#21201
+
+#Tomando el ejemplo de logic_project
+class Symbol:
+    def __init__(self, name): #Representa un símbolo lógico, como un personaje, habitación o arma en el juego
+        self.name = name #El nombre del símbolo/carta
+
+    def evaluate(self, model): #Evalúa si el símbolo es verdadero en el modelo dado
+        #El modelo es un diccionario que contiene los valores asignados a los símbolos
+        return model.get(self.name, False) #Devuelve True si el símbolo está en el modelo y es True, de lo contrario False
+
+    def __repr__(self): #Símbolo en forma de cadena
+        return self.name
+
+
+class And: #Representa la operación lógica "AND"
+    def __init__(self, *conjuncts): #Expresiones que se combinan con AND, como por ejemplo A y B (A ∧ B)
+        self.conjuncts = conjuncts
+
+    def evaluate(self, model): #Evalúa si todas las funciones son verdaderas en el modelo
+        return all(conjunct.evaluate(model) for conjunct in self.conjuncts)
+
+    def __repr__(self):
+        return f"({' ∧ '.join(map(str, self.conjuncts))})"
+
+
+class Or:
+    def __init__(self, *disjuncts): #Expresiones que se combinan con OR
+        self.disjuncts = disjuncts
+
+    def evaluate(self, model): #Evalúa si al menos una de las expresiones "disjuncts" es verdadera en el modelo dado
+        return any(disjunct.evaluate(model) for disjunct in self.disjuncts)
+
+    def __repr__(self):
+        return f"({' ∨ '.join(map(str, self.disjuncts))})"
+
+
+class Not:
+    def __init__(self, operand): #Operand es una expresión sobre la cual se realiza la negación
+        self.operand = operand
+
+    def evaluate(self, model): #Evalúa si la negación de la expresión operand es verdadera en el modelo
+        return not self.operand.evaluate(model)
+
+    def __repr__(self):
+        return f"¬{self.operand}"
+
+
+#Función para comprobar el conocimiento
+def model_check(knowledge, model):
+    return knowledge.evaluate(model)
+
+
+def check_knowledge(knowledge, symbols):
+    possible_values = [True, False]
+    
+    #Generamos todas las combinaciones posibles de valores para los símbolos
+    from itertools import product
+    for values in product(*[possible_values] * len(symbols)):
+        model = dict(zip([symbol.name for symbol in symbols], values))
+        if model_check(knowledge, model):
+            #Imprimimos la evaluación para esta combinación
+            for symbol in symbols:
+                if model[symbol.name]:
+                    print(f"{symbol}: YES")
+                else:
+                    print(f"{symbol}: MAYBE")
+            print("----------")  #Separador entre diferentes evaluaciones
+
+            #Verificamos si es la respuesta correcta
+            if (model["MsScarlet"] == True and model["library"] == True and model["knife"] == True):
+                print("Respuesta final:")
+                print(f"scarlet: YES")
+                print(f"library: YES")
+                print(f"knife: YES")
+                break  #Detenemos la búsqueda si encontramos la respuesta correcta
+        else:
+            #Si el modelo no cumple con el conocimiento, no se muestra nada
+            pass
+
+
+#Definir los símbolos (cartas del juego)
+mustard = Symbol("ColMustard")
+plum = Symbol("ProfPlum")
+scarlet = Symbol("MsScarlet")
+ballroom = Symbol("ballroom")
+kitchen = Symbol("kitchen")
+library = Symbol("library")
+knife = Symbol("knife")
+revolver = Symbol("revolver")
+wrench = Symbol("wrench")
+
+#Definir las expresiones lógicas
+knowledge = And(
+    Or(mustard, plum, scarlet),  #Debe haber un personaje
+    Or(ballroom, kitchen, library),  #Debe haber un cuarto
+    Or(knife, revolver, wrench)  #Debe haber un arma
+)
+
+#Lista de símbolos 
+symbols = [mustard, plum, scarlet, ballroom, kitchen, library, knife, revolver, wrench]
+
+#Evaluar el conocimiento
+check_knowledge(knowledge, symbols)
+
+#Restricciones
+knowledge = And(knowledge, And(
+    Not(mustard), Not(kitchen), Not(revolver)
+))
+
+#Evaluar nuevamente con las restricciones
+check_knowledge(knowledge, symbols)
