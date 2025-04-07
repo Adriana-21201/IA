@@ -62,12 +62,22 @@ def modo_automatico(): #El usuario ingresa la combinación secreta al agente y e
         espacio = nuevo_espacio
         print(f"Espacio reducido a: {len(espacio)} combinaciones")
 
+def diversa(espacio):
+    max_div = -1
+    better = None
+    for comb in espacio:
+        diversidad = len(set(comb))
+        if diversidad > max_div:
+            max_div = diversidad
+            better = comb
+    return list(better)
+
 def modo_tiempoReal(): #El sistema propone una combinación
     espacio = combi.copy()
     intentos = 0
 
     while True: #El usuario responde con el feedback y se reduce el espacio de búsqueda
-        propuesta = list(espacio[0])
+        propuesta = diversa(espacio)
         intentos += 1
         print(f"Propuesta #{intentos}: {propuesta}")
 
