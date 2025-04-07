@@ -1,0 +1,100 @@
+#Proyecto 2
+#Adriana Girón 21201
+
+import itertools #librería que permite generar combinaciones posibles de colores
+
+COLORS = ["azul", "rojo", "blanco", "negro", "verde", "morado"] #lista de colores disponibles
+LENGTH = 4  #Longitud de las combinaciones
+
+#Generar las combinaciones posibles
+combi = list(itertools.product(COLORS, repeat = LENGTH)) #Se generan las combinaciones posibles de 4 colores, permitiendo repeticiones
+
+def evaluar(propuesta, secreto): #Compara una propuesta con la combinación secreta
+    exactas = 0 #Fichas en la posición y color correcto
+    mal_colocadas = 0 #Fichas con color correcto pero posición incorrecta
+    usado_propuesta = [False]*LENGTH
+    usado_secreto = [False]*LENGTH
+
+    #Fichas en posición correcta
+    for i in range(LENGTH):
+        if propuesta[i] == secreto[i]:
+            exactas += 1
+            usado_propuesta[i] = True
+            usado_secreto[i] = True
+
+    #Fichas correctas en posición incorrecta
+    for i in range(LENGTH):
+        if not usado_propuesta[i]:
+            for j in range(LENGTH):
+                if not usado_secreto[j] and propuesta[i] == secreto[j]:
+                    mal_colocadas += 1
+                    usado_secreto[j] = True
+                    break
+
+    return exactas, mal_colocadas
+
+def modo_automatico(): #El usuario ingresa la combinación secreta al agente y este hace propuestas, compara los resultados y reduce el espacio de búsqueda
+    secreto = []
+    print("Ingresa la combinación secreta (opciones: azul, rojo, blanco, negro, verde, morado:)")
+    for i in range(LENGTH):
+        color = input(f"Color {i + 1}: ").lower()
+        secreto.append(color)
+
+    espacio = combi.copy()
+    intentos = 0
+
+    while True:
+        propuesta = list(espacio[0])
+        intentos += 1
+        exactas, mal_colocadas = evaluar(propuesta, secreto)
+
+        print(f"Intento #{intentos}: {propuesta} -> [{exactas} exactas, {mal_colocadas} mal colocadas]")
+
+        if exactas == LENGTH:
+            print(f"¡Combinación adivinada en {intentos} intentos")
+            break
+
+        #Reducir el espacio de búsqueda
+        nuevo_espacio = []
+        for comb in espacio:
+            if evaluar(propuesta, comb) == (exactas, mal_colocadas):
+                nuevo_espacio.append(comb)
+        espacio = nuevo_espacio
+        print(f"Espacio reducido a: {len(espacio)} combinaciones")
+
+def modo_tiempoReal(): #El sistema propone una combinación
+    espacio = combi.copy()
+    intentos = 0
+
+    while True: #El usuario responde con el feedback y se reduce el espacio de búsqueda
+        propuesta = list(espacio[0])
+        intentos += 1
+        print(f"Propuesta #{intentos}: {propuesta}")
+
+        exactas = int(input("¿Cuántas fichas están en posición correcta?: "))
+        mal_colocadas = int(input("¿Cuántas fichas son correctas pero en posición incorrecta?: "))
+
+        if exactas == LENGTH:
+            print(f"¡Combinación adivinada en {intentos} intentos!")
+            break
+
+        #Reducir el espacio de búsqueda
+        nuevo_espacio = []
+        for comb in espacio:
+            if evaluar(propuesta, comb) == (exactas, mal_colocadas):
+                nuevo_espacio.append(comb)
+        espacio = nuevo_espacio
+        print(f"Espacio reducido a: {len(espacio)} combinaciones")
+
+#Menú principal
+print("=== Mastermind ===") #Opciones disponibles de juego
+print("1. Modo Automático (el programa adivina)")
+print("2. Modo Tiempo Real (el usuario adivina)")
+opcion = input("Seleccione un opción: ")
+
+if opcion == "1":
+    modo_automatico()
+elif opcion == "2":
+    modo_tiempoReal()
+else:
+    print("Opción no válida, intenta nuevamente.")
