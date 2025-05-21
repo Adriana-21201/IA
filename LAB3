@@ -1,1 +1,159 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+import nltk
+from collections import Counter
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Estilo de gráficos
+plt.style.use('seaborn-v0_8')
+plt.rcParams.update({'figure.figsize': (12, 8), 'font.size': 12})
+
+# Recursos NLTK
+for recurso in ['punkt', 'stopwords', 'wordnet', 'omw-1.4']:
+    try:
+        nltk.data.find(f'tokenizers/{recurso}' if recurso == 'punkt' else f'corpora/{recurso}')
+    except LookupError:
+        nltk.download(recurso, quiet=True)
+
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words('english'))
+
+# Carga de datos
+print("=" * 80)
+print("2. CARGA Y EXPLORACIÓN DE LOS DATOS (EDA)")
+print("=" * 80)
+
+def cargar_datos():
+    for encoding in ['latin-1', 'utf-8', 'iso-8859-1']:
+        try:
+            return pd.read_csv('spam_ham.csv', sep=';', encoding=encoding)
+        except Exception:
+            continue
+    raise ValueError("No se pudo cargar el archivo")
+
+df = cargar_datos().rename(columns={'Label': 'label', 'SMS_TEXT': 'text'}).dropna(subset=['text'])
+df['label'] = df['label'].str.strip().str.lower()
+df = df[df['label'].isin(['spam', 'ham'])]
+
+print("\n5 mensajes aleatorios del dataset:")
+print(df.sample(5)[['label', 'text']])
+
+# Estadísticas básicas
+total = len(df)
+spam_count = (df['label'] == 'spam').sum()
+ham_count = total - spam_count
+
+print(f"\nMensajes totales: {total}")
+print(f"Mensajes Spam: {spam_count} ({spam_count / total:.2%})")
+print(f"Mensajes Ham: {ham_count} ({ham_count / total:.2%})")
+
+df['length_original'] = df['text'].str.len()
+
+# Funciones auxiliares
+def guardar_grafico(ruta): plt.savefig(ruta, bbox_inches='tight'); plt.close()
+
+def obtener_frecuencias(textos):
+    palabras = []
+    for texto in textos:
+        if isinstance(texto, str):
+            palabras.extend(texto.lower().split())
+    return Counter(palabras)
+
+def generar_wordcloud(texto, color, titulo, archivo):
+    if texto.strip():
+        wc = WordCloud(width=800, height=500, background_color='white',
+                       max_words=200, colormap=color).generate(texto)
+        plt.imshow(wc, interpolation='bilinear')
+        plt.title(titulo, fontsize=16)
+        plt.axis('off')
+        guardar_grafico(archivo)
+
+# Gráficos EDA
+plt.pie([spam_count, ham_count], labels=['Spam', 'Ham'], colors=['#C069F1', '#FC7AC5'],
+        autopct='%1.1f%%', startangle=90)
+plt.title('Proporción de mensajes Spam vs Ham')
+plt.axis('equal')
+guardar_grafico("1_proporcion_spam_ham.png")
+
+sns.countplot(data=df, x='label', hue='label', palette=["#C069F1", "#FC7AC5"], legend=False)
+plt.title("Distribución de mensajes Spam vs Ham")
+guardar_grafico("2_distribucion_mensajes.png")
+
+sns.kdeplot(df[df['label'] == 'spam']['length_original'], label='Spam', color='#C069F1', fill=True, alpha=0.5)
+sns.kdeplot(df[df['label'] == 'ham']['length_original'], label='Ham', color='#FC7AC5', fill=True, alpha=0.5)
+plt.title('Distribución de longitud (original)')
+guardar_grafico("3_densidad_longitud_original.png")
+
+# Frecuencias originales
+for tipo, color, archivo, texto in [('spam', 'Purples_r', '4_top20_spam_original.png', 'SPAM'),
+                                    ('ham', 'Oranges_r', '5_top20_ham_original.png', 'HAM')]:
+    palabras = obtener_frecuencias(df[df['label'] == tipo]['text'])
+    top = pd.DataFrame(palabras.most_common(20), columns=['Palabra', 'Frecuencia'])
+    sns.barplot(data=top, x='Frecuencia', y='Palabra', hue='Palabra', palette=color, legend=False)
+    plt.title(f"Top 20 palabras más frecuentes en mensajes {texto} (original)")
+    guardar_grafico(archivo)
+
+generar_wordcloud(' '.join(df[df['label'] == 'spam']['text'].fillna('')), 'Purples', "WordCloud SPAM (original)", "6_wordcloud_spam_original.png")
+generar_wordcloud(' '.join(df[df['label'] == 'ham']['text'].fillna('')), 'Oranges', "WordCloud HAM (original)", "7_wordcloud_ham_original.png")
+
+# Preprocesamiento
+print("\n" + "=" * 80)
+print("3. PREPROCESAMIENTO DE TEXTO")
+print("=" * 80)
+
+def preprocess(texto):
+    if not isinstance(texto, str): return []
+    tokens = [word for word in word_tokenize(texto.lower()) if word.isalpha()]
+    tokens = [word for word in tokens if word not in stop_words and len(word) > 2]
+    return [lemmatizer.lemmatize(word) for word in tokens]
+
+df['tokens'] = df['text'].apply(preprocess)
+df['clean_text'] = df['tokens'].apply(lambda x: ' '.join(x))
+df['tokens_length'] = df['tokens'].apply(len)
+
+print("\nEjemplos preprocesados:")
+for i in range(min(3, len(df))):
+    print(f"\nMensaje original: {df.iloc[i]['text']}")
+    print(f"Tokens procesados: {df.iloc[i]['tokens']}")
+    print(f"Texto limpio: {df.iloc[i]['clean_text']}")
+
+# Análisis posterior
+print("\n" + "=" * 80)
+print("4. ANÁLISIS POSTERIOR AL PREPROCESAMIENTO")
+print("=" * 80)
+
+sns.kdeplot(df[df['label'] == 'spam']['tokens_length'], label='Spam', color='#C069F1', fill=True, alpha=0.5)
+sns.kdeplot(df[df['label'] == 'ham']['tokens_length'], label='Ham', color='#FC7AC5', fill=True, alpha=0.5)
+plt.title('Distribución longitud mensajes (preprocesados)')
+guardar_grafico("8_densidad_longitud_preprocesado.png")
+
+def frecuencia_tokens(tokens_series):
+    return Counter(token for tokens in tokens_series for token in tokens)
+
+for tipo, color, archivo, texto in [('spam', 'Purples_r', '9_top20_spam_preprocesado.png', 'SPAM'),
+                                    ('ham', 'Oranges_r', '10_top20_ham_preprocesado.png', 'HAM')]:
+    palabras = frecuencia_tokens(df[df['label'] == tipo]['tokens'])
+    print(f"\nTop 20 palabras en {texto} (preprocesado):")
+    for palabra, freq in palabras.most_common(20): print(f"{palabra}: {freq}")
+    top = pd.DataFrame(palabras.most_common(20), columns=['Palabra', 'Frecuencia'])
+    sns.barplot(data=top, x='Frecuencia', y='Palabra', hue='Palabra', palette=color, legend=False)
+    plt.title(f"Top 20 palabras más frecuentes en mensajes {texto} (preprocesado)")
+    guardar_grafico(archivo)
+
+generar_wordcloud(' '.join(df[df['label'] == 'spam']['clean_text'].fillna('')), 'Purples', "WordCloud SPAM (preprocesado)", "11_wordcloud_spam_preprocesado.png")
+generar_wordcloud(' '.join(df[df['label'] == 'ham']['clean_text'].fillna('')), 'Oranges', "WordCloud HAM (preprocesado)", "12_wordcloud_ham_preprocesado.png")
+
+print("\n***** COMPARATIVA: Antes vs Después del Preprocesamiento *****")
+for tipo in ['spam', 'ham']:
+    long_orig = df[df['label'] == tipo]['length_original'].mean()
+    long_tok = df[df['label'] == tipo]['tokens_length'].mean()
+    print(f"{tipo.capitalize()} - Longitud media (caracteres): {long_orig:.2f}, (tokens): {long_tok:.2f}")
+
+df.to_csv('spam_ham_new.csv', index=False)
+print("\nAnálisis completado. Dataset guardado como 'spam_ham_new.csv'.")
+print("Se han generado 12 gráficos para visualizar los resultados.")
 
