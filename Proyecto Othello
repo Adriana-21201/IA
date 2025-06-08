@@ -124,7 +124,7 @@ def ai_move(board, player):
     if corners:
         return random.choice(corners)
 
-    depth = 3  #ajustable
+    depth = 3  
     _, move = minimax(board, depth, player, player, float('-inf'), float('inf'), start_time, time_limit)
     
     if move is None:
