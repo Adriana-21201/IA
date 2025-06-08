@@ -1,0 +1,133 @@
+import time
+import random
+
+DIRECTIONS = [
+    (-1, -1), (-1, 0), (-1, 1),
+    (0, -1),          (0, 1),
+    (1, -1),  (1, 0), (1, 1)
+]
+
+CORNER_POSITIONS = [(0, 0), (0, 7), (7, 0), (7, 7)]
+
+def in_bounds(x, y):
+    return 0 <= x < 8 and 0 <= y < 8
+
+def valid_movements(board, player):
+    opponent = -player
+    valid_moves = []
+
+    for x in range(8):
+        for y in range(8):
+            if board[x][y] != 0:
+                continue
+
+            for dx, dy in DIRECTIONS:
+                i, j = x + dx, y + dy
+                found_opponent = False
+
+                while in_bounds(i, j) and board[i][j] == opponent:
+                    i += dx
+                    j += dy
+                    found_opponent = True
+
+                if found_opponent and in_bounds(i, j) and board[i][j] == player:
+                    valid_moves.append((x, y))
+                    break
+
+    return valid_moves
+
+def apply_move(board, move, player):
+    new_board = [row[:] for row in board]
+    x, y = move
+    new_board[x][y] = player
+
+    for dx, dy in DIRECTIONS:
+        i, j = x + dx, y + dy
+        path = []
+
+        while in_bounds(i, j) and new_board[i][j] == -player:
+            path.append((i, j))
+            i += dx
+            j += dy
+
+        if in_bounds(i, j) and new_board[i][j] == player:
+            for px, py in path:
+                new_board[px][py] = player
+
+    return new_board
+
+def heuristic(board, player):
+    opponent = -player
+    player_score = sum(cell == player for row in board for cell in row)
+    opponent_score = sum(cell == opponent for row in board for cell in row)
+    score_diff = player_score - opponent_score
+
+    #Ocupación de Esquinas
+    player_corners = sum(1 for x, y in CORNER_POSITIONS if board[x][y] == player)
+    opponent_corners = sum(1 for x, y in CORNER_POSITIONS if board[x][y] == opponent)
+    corner_score = 25 * (player_corners - opponent_corners)
+
+    #Mobilidad
+    player_moves = len(valid_movements(board, player))
+    opponent_moves = len(valid_movements(board, opponent))
+    if player_moves + opponent_moves != 0:
+        mobility_score = 100 * (player_moves - opponent_moves) / (player_moves + opponent_moves)
+    else:
+        mobility_score = 0
+
+    return score_diff + corner_score + mobility_score
+
+def minimax(board, depth, player, maximizing_player, alpha, beta, start_time, time_limit):
+    if time.time() - start_time > time_limit:
+        return heuristic(board, player), None
+
+    valid_moves = valid_movements(board, maximizing_player)
+    if depth == 0 or not valid_moves:
+        return heuristic(board, player), None
+
+    best_move = None
+    if maximizing_player == player:
+        max_eval = float('-inf')
+        for move in valid_moves:
+            new_board = apply_move(board, move, maximizing_player)
+            eval_score, _ = minimax(new_board, depth - 1, player, -maximizing_player, alpha, beta, start_time, time_limit)
+            if eval_score > max_eval:
+                max_eval = eval_score
+                best_move = move
+            alpha = max(alpha, eval_score)
+            if beta <= alpha:
+                break
+        return max_eval, best_move
+    else:
+        min_eval = float('inf')
+        for move in valid_moves:
+            new_board = apply_move(board, move, maximizing_player)
+            eval_score, _ = minimax(new_board, depth - 1, player, -maximizing_player, alpha, beta, start_time, time_limit)
+            if eval_score < min_eval:
+                min_eval = eval_score
+                best_move = move
+            beta = min(beta, eval_score)
+            if beta <= alpha:
+                break
+        return min_eval, best_move
+
+def ai_move(board, player):
+    start_time = time.time()
+    time_limit = 3.0  # seconds
+
+    valid_moves = valid_movements(board, player)
+    if not valid_moves:
+        return None
+
+    #Toma una esquina si está disponible 
+    corners = [move for move in valid_moves if move in CORNER_POSITIONS]
+    if corners:
+        return random.choice(corners)
+
+    depth = 3  #ajustable
+    _, move = minimax(board, depth, player, player, float('-inf'), float('inf'), start_time, time_limit)
+    
+    if move is None:
+        return random.choice(valid_moves)
+    
+    return move
